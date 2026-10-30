@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Science World Teacher Room</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=Barlow:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/teacher.css">
+</head>
+<body>
+<header class="top">
+  <div class="top-inner">
+    <div class="brand">Dr. Omar’s Science World <span>Teacher room</span></div>
+    <nav class="tabs" aria-label="Sections">
+      <button data-tab="students" aria-current="page">Students <span id="pending-count" class="badge" hidden></span></button>
+      <button data-tab="sets">Question sets</button>
+    </nav>
+    <div class="me"><span id="me-name"></span> <button id="sign-out" class="ghost">Log out</button></div>
+  </div>
+</header>
+
+<main>
+  <p id="notice" class="notice" role="status" hidden></p>
+
+  <section id="login" hidden>
+    <form id="login-form" class="card narrow">
+      <h1>Teacher log in</h1>
+      <label>Username <input id="li-user" autocomplete="username" required autocapitalize="none" spellcheck="false"></label>
+      <label>Password <input id="li-pass" type="password" autocomplete="current-password" required></label>
+      <button class="primary" type="submit">Log in</button>
+      <p class="hint">Students log in on the <a href="index.html">game page</a>.</p>
+    </form>
+  </section>
+
+  <section id="students" hidden>
+    <div class="section-head">
+      <h1>Students</h1>
+      <button id="reload-students" class="ghost">Refresh</button>
+    </div>
+    <div class="table-wrap">
+      <table class="grid">
+        <thead><tr><th>Name</th><th>Username</th><th>Status</th><th class="num">O-Bucks</th><th class="num">Races</th><th>Last race</th><th></th></tr></thead>
+        <tbody id="student-rows"></tbody>
+      </table>
+    </div>
+    <p id="no-students" class="empty" hidden>No students have signed up yet. Share the game link and ask them to choose Sign up.</p>
+  </section>
+
+  <section id="sets" hidden>
+    <div class="section-head"><h1>Question sets</h1></div>
+
+    <details id="import" class="card" open>
+      <summary>Import a new set</summary>
+      <div class="import-grid">
+        <div class="fields">
+          <label>Title <input id="set-title" placeholder="Forest Valley Circuit" required></label>
+          <label>Season <input id="set-season" placeholder="Plant Season"></label>
+          <label>Mode
+            <select id="set-mode">
+              <option value="solo">Solo bank</option>
+              <option value="friends">Friends bank (used in Stage 3)</option>
+              <option value="teacher">Teacher bank (used in Stage 3)</option>
+            </select>
+          </label>
+          <label>Questions file (.csv or .json) <input id="set-file" type="file" accept=".csv,.json,text/csv,application/json"></label>
+          <p class="hint">CSV columns: <code>question, option_a, option_b, option_c, option_d, answer</code>. The answer is A, B, C or D. Exactly 10 rows. <button id="load-sample" class="linkish" type="button">Load the sample set</button></p>
+        </div>
+        <label class="paste">…or paste CSV here
+          <textarea id="set-text" rows="9" spellcheck="false" placeholder="question,option_a,option_b,option_c,option_d,answer&#10;Which gas do plants absorb?,Oxygen,Carbon dioxide,Nitrogen,Hydrogen,B"></textarea>
+        </label>
+      </div>
+      <div id="import-errors" class="errors" hidden></div>
+      <div id="import-preview" hidden>
+        <h2>Preview <span class="muted">· saved as a hidden draft</span></h2>
+        <ol id="preview-list" class="qlist"></ol>
+        <button id="save-set" class="primary">Save as hidden draft</button>
+      </div>
+    </details>
+
+    <div id="set-list" class="set-list"></div>
+    <p id="no-sets" class="empty" hidden>No sets yet. Import one above.</p>
+  </section>
+</main>
+
+<script type="module" src="js/teacher.js"></script>
+</body>
+</html>

@@ -54,15 +54,24 @@ export class RaceEngine {
    * change nothing (AC16). Answers after the finish are ignored (R06).
    */
   answer(id, questionId, choice, requestId) {
+    const q = this.questions.find((x) => x.id === questionId);
+    return this.record(id, questionId, !!q && choice === q.answer, requestId);
+  }
+
+  /**
+   * Apply an already-judged answer. Used when the server holds the answer key
+   * (signed-in races) and for simulated bots, which have no answer to check.
+   */
+  record(id, questionId, isCorrect, requestId) {
     if (requestId && this.processed.has(requestId)) {
       return { ...this.processed.get(requestId), duplicate: true };
     }
-    const result = this.#apply(id, questionId, choice);
+    const result = this.#apply(id, questionId, isCorrect);
     if (requestId) this.processed.set(requestId, result);
     return result;
   }
 
-  #apply(id, questionId, choice) {
+  #apply(id, questionId, isCorrect) {
     const p = this.players.get(id);
     if (!p) return { status: 'rejected', reason: 'unknown-player' };
     if (this.finished) return { status: 'rejected', reason: 'race-finished' };
@@ -72,7 +81,7 @@ export class RaceEngine {
     const firstAttempt = !p.attempted.has(q.id);
     p.attempted.add(q.id);
 
-    if (choice === q.answer) {
+    if (isCorrect) {
       p.correct.add(q.id);
       if (firstAttempt) p.firstTryCorrect++;
       p.qIndex++;

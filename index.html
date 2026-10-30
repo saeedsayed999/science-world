@@ -1,5 +1,9 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Science World Racing</title>
-<meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,500;0,700;1,700&family=Barlow:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="css/style.css">
@@ -9,6 +13,8 @@
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
 } }
 </script>
+</head>
+<body>
 
 <canvas id="gl" aria-label="Race track"></canvas>
 
@@ -24,17 +30,64 @@
 </button>
 <div id="fps" hidden></div>
 
+<!-- Sign in -->
+<section id="auth" class="screen" hidden>
+  <div class="auth-card glass">
+    <div class="brand-name">Dr. Omar’s Science World</div>
+    <div class="auth-tabs" role="tablist">
+      <button id="tab-login" role="tab" aria-selected="true">Log in</button>
+      <button id="tab-signup" role="tab" aria-selected="false">Sign up</button>
+    </div>
+    <form id="login-form" class="auth-form">
+      <label>Username <input id="li-user" autocomplete="username" required autocapitalize="none" spellcheck="false"></label>
+      <label>Password <input id="li-pass" type="password" autocomplete="current-password" required></label>
+      <button class="play small" type="submit">Log in</button>
+    </form>
+    <form id="signup-form" class="auth-form" hidden>
+      <div class="row2">
+        <label>First name <input id="su-first" autocomplete="given-name" required></label>
+        <label>Second name <input id="su-last" autocomplete="family-name" required></label>
+      </div>
+      <label>Username <input id="su-user" autocomplete="username" required autocapitalize="none" spellcheck="false" placeholder="e.g. ali.hassan"></label>
+      <label>Password <input id="su-pass" type="password" autocomplete="new-password" minlength="6" required></label>
+      <button class="play small" type="submit">Create student account</button>
+      <p class="fine">Your teacher approves new accounts before you can race.</p>
+    </form>
+    <p id="auth-msg" class="auth-msg" role="status"></p>
+    <button id="guest" class="linkish">Try a guest race (nothing is saved)</button>
+  </div>
+</section>
+
+<!-- Waiting for approval -->
+<section id="pending" class="screen" hidden>
+  <div class="auth-card glass">
+    <div class="brand-name">Waiting for approval</div>
+    <p>Hi <span id="pending-name"></span>. Your teacher needs to approve your account before you can race.</p>
+    <div class="res-actions">
+      <button id="pending-refresh" class="play small">Check again</button>
+      <button class="back static sign-out">Log out</button>
+    </div>
+  </div>
+</section>
+
 <!-- Home -->
 <section id="home" class="screen" hidden>
   <header class="brand">
     <span class="brand-name">Dr. Omar’s Science World</span>
-    <span class="brand-sub">Plant Season · Forest Valley Circuit</span>
+    <span class="brand-sub" id="home-sub">Racing</span>
   </header>
+  <div class="player-bar">
+    <span class="wallet" title="O-Bucks"><span class="coin" aria-hidden="true">O</span><span id="balance">0</span></span>
+    <span class="who"><span id="who-name"></span> · <button class="linkish sign-out">Log out</button></span>
+  </div>
   <div class="home-cta">
+    <label class="set-pick">Race
+      <select id="set-select"></select>
+    </label>
     <button id="play" class="play">Play <span aria-hidden="true">›</span></button>
     <nav class="game-tabs" aria-label="Games"><span class="tab active">Racing</span></nav>
   </div>
-  <p class="stage-note">Stage 1 preview · Solo race against labeled bots · Rewards are shown but not saved yet</p>
+  <p class="stage-note" id="stage-note">Stage 2 preview · Solo races save O-Bucks to your account</p>
 </section>
 
 <!-- Mode select -->
@@ -105,7 +158,7 @@
       <tbody id="res-rows"></tbody>
     </table>
     <div class="rewards">
-      <div class="label">Your O-Bucks</div>
+      <div class="label" id="rw-label">O-Bucks saved to your account</div>
       <dl>
         <div><dt>First attempts <span id="rw-first"></span></dt><dd id="rw-first-v"></dd></div>
         <div><dt>Correct answers <span id="rw-correct"></span></dt><dd id="rw-correct-v"></dd></div>
@@ -113,7 +166,7 @@
         <div><dt>Winner</dt><dd id="rw-win-v"></dd></div>
         <div class="total"><dt>Total</dt><dd><span id="rw-total"></span> O-Bucks</dd></div>
       </dl>
-      <p class="fine">Every start-to-finish participant earns +500 O-Bucks.</p>
+      <p class="fine" id="rw-note">Every start-to-finish participant earns +500 O-Bucks.</p>
     </div>
     <div class="res-actions">
       <button id="again" class="play small">Race again</button>
@@ -139,3 +192,5 @@
 </div>
 
 <script type="module" src="js/main.js"></script>
+</body>
+</html>

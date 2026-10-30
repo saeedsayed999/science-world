@@ -118,6 +118,15 @@ test('player who left before the finish gets no participation bonus', () => {
   assert.equal(e.rewards('b').participation.amount, 0);
 });
 
+test('record() applies a server verdict without an answer key', () => {
+  const noKeys = Q.map(({ id, text, options }) => ({ id, text, options }));
+  const e = new RaceEngine({ participants: people, questions: noKeys, mode: 'solo', playerId: 'me' });
+  assert.equal(e.record('me', 'q1', false, 'r1').status, 'wrong');
+  assert.equal(e.record('me', 'q1', true, 'r2').status, 'correct');
+  assert.equal(e.record('me', 'q1', true, 'r2').duplicate, true);
+  assert.equal(e.currentQuestion('me').id, 'q2');
+});
+
 test('results list correct counts with shared ranks for ties', () => {
   const e = race('friends');
   right(e, 'b'); right(e, 'c');

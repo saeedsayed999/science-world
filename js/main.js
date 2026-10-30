@@ -1,10 +1,13 @@
-// Screen flow and race controller for the Stage 1 Solo demo.
-// Rules come from RaceEngine; RaceScene only animates what the engine decides.
+// Screen flow and race controller for the student game.
+// Signed-in races: the server checks every answer and saves rewards (supabase/schema.sql).
+// Guest races: the same engine runs locally with the sample set and saves nothing.
+// RaceScene only animates what the engine decides.
 
 import { RaceEngine } from './race-engine.js';
 import { RaceScene, loadCarTemplate } from './race-scene.js';
 import { RACE, BOTS, PLAYER_COLOR } from './config.js';
 import { SAMPLE_SET } from './questions.js';
+import { api } from './supabase.js';
 
 const $ = (sel) => document.querySelector(sel);
 const LETTERS = ['A', 'B', 'C', 'D'];
@@ -23,6 +26,8 @@ const settings = {
 
 let scene, template;
 let game = null; // active race controller state
+let profile = null; // signed-in student, or null for a guest
+let sets = [];
 
 // ---------- boot ----------
 
@@ -32,8 +37,69 @@ async function boot() {
   await showcaseCars();
   scene.onUpdate = (dt) => tick(dt);
   scene.start();
+  await route();
   $('#loading').hidden = true;
+}
+
+// ---------- accounts ----------
+
+const fmt = (n) => Number(n).toLocaleString('en-US');
+
+async function route() {
+  const session = await api.session().catch(() => null);
+  if (!session) { profile = null; return show('auth'); }
+  profile = await api.profile();
+  if (!profile) { await api.logOut(); return show('auth'); }
+  if (profile.role === 'teacher') { location.href = 'teacher.html'; return; }
+  if (profile.status !== 'approved') {
+    $('#pending-name').textContent = profile.first_name || profile.username;
+    return show('pending');
+  }
+  await loadHome();
+}
+
+async function loadHome() {
+  if (profile) {
+    profile = await api.profile();
+    sets = await api.releasedSets();
+    $('#who-name').textContent = `${profile.first_name} ${profile.last_name}`.trim();
+    $('#balance').textContent = fmt(profile.balance);
+    $('#stage-note').textContent = sets.length
+      ? 'Stage 2 preview · Solo races save O-Bucks to your account'
+      : 'No races are released yet. Your teacher will release one soon.';
+  } else {
+    sets = [{ id: 'guest', title: SAMPLE_SET.title, season: SAMPLE_SET.season }];
+    $('#who-name').textContent = 'Guest';
+    $('#balance').textContent = '0';
+    $('#stage-note').textContent = 'Guest race · nothing is saved. Log in to earn O-Bucks.';
+  }
+  const sel = $('#set-select');
+  const keep = sel.value;
+  sel.replaceChildren(...sets.map((st) => new Option(st.season ? `${st.season} · ${st.title}` : st.title, st.id)));
+  if (sets.some((st) => st.id === keep)) sel.value = keep;
+  $('#play').disabled = sets.length === 0;
+  updateHomeSub();
   show('home');
+}
+
+function updateHomeSub() {
+  const st = sets.find((x) => x.id === $('#set-select').value);
+  $('#home-sub').textContent = st ? [st.season, st.title].filter(Boolean).join(' · ') : 'Racing';
+}
+
+function authMessage(text, isError = false) {
+  const m = $('#auth-msg');
+  m.textContent = text;
+  m.classList.toggle('error', isError);
+}
+
+function authTab(which) {
+  const login = which === 'login';
+  $('#tab-login').setAttribute('aria-selected', login);
+  $('#tab-signup').setAttribute('aria-selected', !login);
+  $('#login-form').hidden = !login;
+  $('#signup-form').hidden = login;
+  authMessage('');
 }
 
 async function showcaseCars() {
@@ -54,13 +120,27 @@ function show(id) {
 function rand([a, b]) { return a + Math.random() * (b - a); }
 
 async function startSolo() {
+  const setId = $('#set-select').value;
+  let questions = SAMPLE_SET.questions, raceId = null;
+  if (profile) {
+    try {
+      const data = await api.startRace(setId);
+      questions = data.questions;
+      raceId = data.race_id;
+    } catch (err) {
+      $('#stage-note').textContent = err.message;
+      return show('home');
+    }
+  }
   const participants = [
     ...BOTS.names.map((name, i) => ({ id: name, name, isBot: true, color: BOTS.colors[i] })),
     { id: PLAYER, name: 'You', color: PLAYER_COLOR },
   ];
-  const engine = new RaceEngine({ participants, questions: SAMPLE_SET.questions, mode: 'solo', playerId: PLAYER });
+  const engine = new RaceEngine({ participants, questions, mode: 'solo', playerId: PLAYER });
   game = {
     engine,
+    raceId,
+    busy: false,
     colors: Object.fromEntries(participants.map((p) => [p.id, p.color])),
     phase: 'countdown',
     timer: 0,
@@ -123,12 +203,32 @@ function showQuestion() {
   $('#qpanel').hidden = false;
 }
 
-function answer(choice) {
-  if (!game || game.phase !== 'question') return;
-  const q = game.engine.currentQuestion(PLAYER);
+async function answer(choice) {
+  if (!game || game.phase !== 'question' || game.busy) return;
+  const g = game;
+  const q = g.engine.currentQuestion(PLAYER);
   const btn = $(`#opts .opt[data-i="${choice}"]`);
-  if (!q || btn.disabled) return;
-  const res = game.engine.answer(PLAYER, q.id, choice, `${PLAYER}:${q.id}:${++game.attempt}`);
+  if (!q || !btn || btn.disabled) return;
+  const requestId = `${g.raceId ?? 'guest'}:${q.id}:${++g.attempt}`;
+  let res;
+  if (g.raceId) {
+    // The server judges the answer; the request id makes a retried request safe.
+    g.busy = true;
+    btn.classList.add('checking');
+    let verdict;
+    for (let tries = 0; tries < 3 && !verdict; tries++) {
+      verdict = await api.submitAnswer(g.raceId, q.id, choice, requestId).catch(() => null);
+    }
+    g.busy = false;
+    btn.classList.remove('checking');
+    if (game !== g) return;
+    if (!verdict) return showConnectionProblem();
+    if (verdict.status === 'rejected') return;
+    res = g.engine.record(PLAYER, q.id, verdict.status === 'correct', requestId);
+  } else {
+    res = g.engine.answer(PLAYER, q.id, choice, requestId);
+  }
+  if (game !== g || g.phase !== 'question') return;
   afterMove(PLAYER, res);
   if (res.status === 'correct') {
     btn.classList.add('right');
@@ -150,6 +250,12 @@ function answer(choice) {
     fb.innerHTML = `<span class="pill bad">Try again</span><span class="pill bad">${res.passedBy ? '−1 position' : 'Last place'}</span>`;
     fb.classList.remove('flash'); void fb.offsetWidth; fb.classList.add('flash');
   }
+}
+
+function showConnectionProblem() {
+  const fb = $('#feedback');
+  fb.hidden = false;
+  fb.innerHTML = '<span class="pill bad">Connection problem · tap your answer again</span>';
 }
 
 function startFreeDrive() {
@@ -198,8 +304,7 @@ function tickBots(dt) {
     if (b.wait > 0) continue;
     const q = game.engine.currentQuestion(b.id);
     if (!q) continue;
-    const choice = Math.random() < b.accuracy ? q.answer : (q.answer + 1 + Math.floor(Math.random() * 3)) % 4;
-    const res = game.engine.answer(b.id, q.id, choice);
+    const res = game.engine.record(b.id, q.id, Math.random() < b.accuracy);
     afterMove(b.id, res);
     if (res.finished) return finishRace();
     // Bots follow the same rhythm as the player: 1.6 s overtake + 15 s drive after a correct answer.
@@ -234,10 +339,13 @@ function finishRace() {
   const youWon = engine.winnerId === PLAYER;
   const winner = engine.players.get(engine.winnerId);
   banner('Race complete', youWon ? 'You win!' : `${winner.name} wins`, youWon ? 'good' : 'neutral');
-  setTimeout(() => renderResults(engine), 2200);
+  const g = game;
+  const saved = !g.raceId ? Promise.resolve(null)
+    : (youWon ? api.raceSummary(g.raceId) : api.finishSolo(g.raceId, winner.name)).catch(() => null);
+  Promise.all([saved, new Promise((r) => setTimeout(r, 2200))]).then(([summary]) => renderResults(engine, g, summary));
 }
 
-function renderResults(engine) {
+function renderResults(engine, g, summary) {
   const youWon = engine.winnerId === PLAYER;
   const winner = engine.players.get(engine.winnerId);
   $('#res-title').textContent = youWon ? 'You win!' : `${winner.name} wins`;
@@ -248,19 +356,36 @@ function renderResults(engine) {
     tr.querySelector('.rk').textContent = r.rank;
     tr.querySelector('.chip').style.background = r.color;
     tr.querySelector('.nm').textContent = r.name;
-    if (r.isBot) tr.querySelector('.nm').insertAdjacentHTML('afterend', '<span class="bot">BOT</span>');
+    if (r.isBot) tr.querySelector('.nm').insertAdjacentHTML('beforeend', '<span class="bot">BOT</span>');
     tr.querySelector('.num').textContent = `${r.correct} / ${RACE.questionsPerRace}`;
     return tr;
   }));
   const rw = engine.rewards(PLAYER);
-  const fmt = (n) => n.toLocaleString('en-US');
   $('#rw-first').textContent = `${rw.firstAttempts.count} × 100`;
-  $('#rw-first-v').textContent = fmt(rw.firstAttempts.amount);
   $('#rw-correct').textContent = `${rw.correct.count} × 100`;
-  $('#rw-correct-v').textContent = fmt(rw.correct.amount);
-  $('#rw-part-v').textContent = fmt(rw.participation.amount);
-  $('#rw-win-v').textContent = rw.winner.eligible ? fmt(rw.winner.amount) : 'Not in Solo';
-  $('#rw-total').textContent = fmt(rw.total);
+  if (summary) {
+    // Show what the server actually saved, which can be less than the race total
+    // when this set's rewards were already earned (replays are practice).
+    const e = summary.earned || {};
+    const total = Object.values(e).reduce((a, b) => a + Number(b), 0);
+    $('#rw-label').textContent = 'O-Bucks saved to your account';
+    $('#rw-first-v').textContent = fmt(e.first_attempt || 0);
+    $('#rw-correct-v').textContent = fmt(e.first_correct || 0);
+    $('#rw-part-v').textContent = fmt(e.participation || 0);
+    $('#rw-win-v').textContent = 'Not in Solo';
+    $('#rw-total').textContent = fmt(total);
+    $('#rw-note').textContent = total < rw.total
+      ? `Balance: ${fmt(summary.balance)} O-Bucks. Questions and bonuses already rewarded on this set earn nothing again.`
+      : `Balance: ${fmt(summary.balance)} O-Bucks. Every start-to-finish participant earns +500.`;
+  } else {
+    $('#rw-label').textContent = g.raceId ? 'O-Bucks (could not reach the server)' : 'Guest race · not saved';
+    $('#rw-first-v').textContent = fmt(rw.firstAttempts.amount);
+    $('#rw-correct-v').textContent = fmt(rw.correct.amount);
+    $('#rw-part-v').textContent = fmt(rw.participation.amount);
+    $('#rw-win-v').textContent = 'Not in Solo';
+    $('#rw-total').textContent = fmt(rw.total);
+    $('#rw-note').textContent = g.raceId ? 'Your answers were saved as you raced. Reopen the game to see your balance.' : 'Log in to keep O-Bucks.';
+  }
   show('results');
   game = null;
   scene.mode = 'attract';
@@ -270,7 +395,7 @@ function leaveRace() {
   if (game) game.engine.markLeft(PLAYER);
   game = null;
   scene.setFreeDrive(false);
-  showcaseCars().then(() => show('home'));
+  showcaseCars().then(() => loadHome());
 }
 
 function renderPositions() {
@@ -366,7 +491,37 @@ $('#play').addEventListener('click', () => show('modes'));
 $('#modes-back').addEventListener('click', () => show('home'));
 $('#mode-solo').addEventListener('click', () => startSolo());
 $('#again').addEventListener('click', () => startSolo());
-$('#res-home').addEventListener('click', () => showcaseCars().then(() => show('home')));
+$('#res-home').addEventListener('click', () => showcaseCars().then(() => loadHome()));
+$('#set-select').addEventListener('change', updateHomeSub);
+
+$('#tab-login').addEventListener('click', () => authTab('login'));
+$('#tab-signup').addEventListener('click', () => authTab('signup'));
+$('#login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  authMessage('Logging in…');
+  try {
+    await api.logIn($('#li-user').value, $('#li-pass').value);
+    authMessage('');
+    await route();
+  } catch (err) { authMessage(err.message, true); }
+});
+$('#signup-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  authMessage('Creating your account…');
+  try {
+    await api.signUp({
+      username: $('#su-user').value, password: $('#su-pass').value,
+      firstName: $('#su-first').value, lastName: $('#su-last').value,
+    });
+    authMessage('');
+    await route();
+  } catch (err) { authMessage(err.message, true); }
+});
+$('#guest').addEventListener('click', () => { profile = null; loadHome(); });
+for (const b of document.querySelectorAll('.sign-out')) {
+  b.addEventListener('click', async () => { await api.logOut(); profile = null; authTab('login'); show('auth'); });
+}
+$('#pending-refresh').addEventListener('click', () => route());
 $('#leave').addEventListener('click', () => leaveRace());
 
 // Read-only handle for automated browser checks; it changes no rules.
