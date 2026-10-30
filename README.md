@@ -1,6 +1,7 @@
 # Dr. Omar's Science World: Racing demo
 
-Live site: https://dynamic-kashata-ec4dd6.netlify.app (teacher room: `/teacher.html`). Netlify redeploys on every push to `master`.
+Live site: https://saeedsayed999.github.io/science-world/ (teacher room: `teacher.html`). GitHub Pages redeploys on every push to `master`.
+Netlify (`netlify.toml`) also works, but `*.netlify.app` is unreachable on the owner's network, so GitHub Pages is the main host.
 
 Browser racing game where correct science answers move your car up the field.
 Built from `Science_World_Complete_Handoff.md` (v1.0, 30 Oct 2026).
