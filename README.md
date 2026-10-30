@@ -1,5 +1,7 @@
 # Dr. Omar's Science World: Racing demo
 
+Live site: https://dynamic-kashata-ec4dd6.netlify.app (teacher room: `/teacher.html`). Netlify redeploys on every push to `master`.
+
 Browser racing game where correct science answers move your car up the field.
 Built from `Science_World_Complete_Handoff.md` (v1.0, 30 Oct 2026).
 
@@ -8,7 +10,7 @@ Built from `Science_World_Complete_Handoff.md` (v1.0, 30 Oct 2026).
 | Stage | Scope | Status |
 | --- | --- | --- |
 | 1 | Playable 10-question Solo race (Three.js) | **Done** |
-| 2 | Student/teacher accounts, approval, saved O-Bucks, teacher question-set import and release | **Built, tested locally against the SQL; waiting for the schema to be applied in Supabase** |
+| 2 | Student/teacher accounts, approval, saved O-Bucks, teacher question-set import and release | **Done**: 15/15 live checks pass against Supabase (`node tests/live-e2e.mjs`) |
 | 3 | Live multiplayer lobby (Friends / Teacher races) | Needs Stage 2 + a real web host |
 | 4 | Reporting: teacher export, parent progress | Needs Stage 2 |
 
