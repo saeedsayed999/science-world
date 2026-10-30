@@ -12,7 +12,7 @@ Built from `Science_World_Complete_Handoff.md` (v1.0, 30 Oct 2026).
 | --- | --- | --- |
 | 1 | Playable 10-question Solo race (Three.js) | **Done** |
 | 2 | Student/teacher accounts, approval, saved O-Bucks, teacher question-set import and release | **Done**: 15/15 live checks pass against Supabase (`node tests/live-e2e.mjs`) |
-| 3 | Live multiplayer lobby (Friends / Teacher races) | **Built; SQL tests pass locally; needs `supabase/multiplayer.sql` applied** |
+| 3 | Live multiplayer lobby (Friends / Teacher races) | **Done**: 14/14 two-player live checks + browser realtime test |
 | 4 | Reporting: teacher export, parent progress | Needs Stage 2 |
 
 ## Run locally
