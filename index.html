@@ -1,0 +1,141 @@
+<title>Science World Racing</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,500;0,700;1,700&family=Barlow:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/style.css">
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+
+<canvas id="gl" aria-label="Race track"></canvas>
+
+<div id="loading">Loading the circuit…</div>
+
+<div id="rotate" role="alert">
+  <div class="rot-icon" aria-hidden="true"></div>
+  <p>Turn your device sideways to race.</p>
+</div>
+
+<button id="open-settings" class="icon-btn" aria-label="Graphics settings">
+  <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.5 7.5 0 0 0-1.7-1L15 3h-4l-.4 2.9a7.5 7.5 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.5 7.5 0 0 0 1.7 1L11 21h4l.4-2.9a7.5 7.5 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"/></svg>
+</button>
+<div id="fps" hidden></div>
+
+<!-- Home -->
+<section id="home" class="screen" hidden>
+  <header class="brand">
+    <span class="brand-name">Dr. Omar’s Science World</span>
+    <span class="brand-sub">Plant Season · Forest Valley Circuit</span>
+  </header>
+  <div class="home-cta">
+    <button id="play" class="play">Play <span aria-hidden="true">›</span></button>
+    <nav class="game-tabs" aria-label="Games"><span class="tab active">Racing</span></nav>
+  </div>
+  <p class="stage-note">Stage 1 preview · Solo race against labeled bots · Rewards are shown but not saved yet</p>
+</section>
+
+<!-- Mode select -->
+<section id="modes" class="screen" hidden>
+  <button id="modes-back" class="back">‹ Back</button>
+  <div class="bays">
+    <button id="mode-solo" class="bay">
+      <span class="bay-name">Solo</span>
+      <span class="bay-desc">Race simulated rivals</span>
+      <span class="bay-go">Start race ›</span>
+    </button>
+    <div class="bay locked" aria-disabled="true">
+      <span class="bay-name">Play with Friends</span>
+      <span class="bay-desc">Live races with your group</span>
+      <span class="bay-lock">Added in Stage 3</span>
+    </div>
+    <div class="bay locked" aria-disabled="true">
+      <span class="bay-name">Play with Teacher</span>
+      <span class="bay-desc">Class races hosted by your teacher</span>
+      <span class="bay-lock">Added in Stage 3</span>
+    </div>
+  </div>
+</section>
+
+<!-- Race HUD -->
+<section id="hud" class="screen" hidden>
+  <div id="positions" class="glass">
+    <div class="label">Race position</div>
+    <ol></ol>
+  </div>
+
+  <div id="qpanel" class="nocopy" hidden>
+    <div id="qcount" class="qcount"></div>
+    <div id="qtext" class="glass qtext"></div>
+    <div id="opts" class="opts"></div>
+    <div id="feedback" hidden></div>
+  </div>
+
+  <div id="freedrive" hidden>
+    <div class="fd-label">Free Drive</div>
+    <div id="fdclock" class="fd-clock">00:15</div>
+    <div class="fd-hint">Steer for fun · your place is set by answers</div>
+  </div>
+
+  <div id="banner" hidden></div>
+  <div id="countdown" hidden></div>
+
+  <canvas id="minimap" width="180" height="150" class="glass" aria-hidden="true"></canvas>
+
+  <div id="steer" hidden>
+    <button id="steer-l" class="steer-btn" aria-label="Steer left">‹</button>
+    <span class="steer-keys">← → or A / D</span>
+    <button id="steer-r" class="steer-btn" aria-label="Steer right">›</button>
+  </div>
+
+  <button id="leave" class="back leave">Leave race</button>
+</section>
+
+<!-- Results -->
+<section id="results" class="screen" hidden>
+  <div class="res-card glass">
+    <div class="res-head">
+      <div class="res-kicker">Race complete</div>
+      <h1 id="res-title">You win!</h1>
+    </div>
+    <table class="res-table">
+      <thead><tr><th>#</th><th>Racer</th><th class="num">Correct</th></tr></thead>
+      <tbody id="res-rows"></tbody>
+    </table>
+    <div class="rewards">
+      <div class="label">Your O-Bucks</div>
+      <dl>
+        <div><dt>First attempts <span id="rw-first"></span></dt><dd id="rw-first-v"></dd></div>
+        <div><dt>Correct answers <span id="rw-correct"></span></dt><dd id="rw-correct-v"></dd></div>
+        <div><dt>Participation</dt><dd id="rw-part-v"></dd></div>
+        <div><dt>Winner</dt><dd id="rw-win-v"></dd></div>
+        <div class="total"><dt>Total</dt><dd><span id="rw-total"></span> O-Bucks</dd></div>
+      </dl>
+      <p class="fine">Every start-to-finish participant earns +500 O-Bucks.</p>
+    </div>
+    <div class="res-actions">
+      <button id="again" class="play small">Race again</button>
+      <button id="res-home" class="back">Home</button>
+    </div>
+  </div>
+</section>
+
+<!-- Settings -->
+<div id="settings" class="glass" role="dialog" aria-labelledby="settings-title" hidden>
+  <h2 id="settings-title">Graphics</h2>
+  <div class="seg-label">Quality</div>
+  <div class="seg">
+    <button data-quality="low">Low</button><button data-quality="medium">Medium</button><button data-quality="high">High</button>
+  </div>
+  <div class="seg-label">Frame rate limit</div>
+  <div class="seg">
+    <button data-fps="30">30 FPS</button><button data-fps="60">60 FPS</button>
+  </div>
+  <label class="check"><input type="checkbox" id="show-fps"> Show frame rate</label>
+  <p class="fine">Graphics never change race results.</p>
+  <button id="close-settings" class="play small">Done</button>
+</div>
+
+<script type="module" src="js/main.js"></script>
