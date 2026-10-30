@@ -1,1 +1,1 @@
-{"type":"module","private":true,"name":"science-world","scripts":{"test":"node --test tests/"}}
+{"type":"module","private":true,"name":"science-world","scripts":{"test":"node --test tests/*.test.mjs"}}
