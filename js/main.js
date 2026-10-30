@@ -28,7 +28,7 @@ let game = null; // active race controller state
 
 async function boot() {
   scene = new RaceScene($('#gl'), { quality: settings.quality, fpsCap: settings.fpsCap });
-  template = await loadCarTemplate('assets/car.glb');
+  template = await loadCarTemplate('assets/car.json');
   await showcaseCars();
   scene.onUpdate = (dt) => tick(dt);
   scene.start();

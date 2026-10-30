@@ -1,6 +1,8 @@
-"""Builds the low-poly race car used in the game and exports assets/car.glb.
+"""Builds the low-poly race car used in the game and exports assets/car.json
+(embedded glTF; .json because the artifact host does not serve .glb).
 
-Run headless:  blender -b --factory-startup -P tools/make_car.py -- assets/car.glb
+Run headless:  blender -b --factory-startup -P tools/make_car.py -- car.glb
+       node tools/glb_to_json.mjs car.glb assets/car.json
 
 Design targets (phones + laptops): < 3k triangles, 7 shared materials,
 no textures. The "Body" material is recoloured per car at runtime, so one
