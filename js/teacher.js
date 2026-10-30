@@ -3,6 +3,8 @@
 
 import { api } from './supabase.js';
 import { parseQuestionFile } from './import-sets.js';
+import { RoomSync } from './room-sync.js';
+import { RaceEngine } from './race-engine.js';
 
 const $ = (sel) => document.querySelector(sel);
 const fmt = (n) => Number(n).toLocaleString('en-US');
@@ -19,7 +21,7 @@ function notice(text, isError = false) {
 }
 
 function showTab(name) {
-  for (const s of ['login', 'students', 'sets']) $('#' + s).hidden = s !== name;
+  for (const s of ['login', 'students', 'sets', 'live']) $('#' + s).hidden = s !== name;
   for (const b of document.querySelectorAll('[data-tab]')) {
     if (b.dataset.tab === name) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
   }
@@ -27,6 +29,7 @@ function showTab(name) {
   $('.me').hidden = name === 'login';
   if (name === 'students') loadStudents();
   if (name === 'sets') loadSets();
+  if (name === 'live') loadLive();
 }
 
 async function route() {
@@ -200,6 +203,91 @@ $('#save-set').addEventListener('click', async () => {
   } catch (e) { notice(e.message, true); }
   $('#save-set').disabled = false;
 });
+
+// ---------- live races ----------
+
+let hosting = null; // { sync, engine, applied }
+
+async function loadLive() {
+  let list = [];
+  try { list = (await api.sets()).filter((x) => x.mode === 'teacher'); } catch (e) { notice(e.message, true); }
+  $('#host-set').replaceChildren(...list.map((x) => new Option([x.season, x.title].filter(Boolean).join(' · '), x.id)));
+  $('#host-empty').hidden = list.length > 0;
+  $('#host-form button').disabled = list.length === 0;
+  if (!hosting) {
+    const active = await api.myActiveRoom().catch(() => null);
+    if (active) watchRoom(active);
+  }
+}
+
+function watchRoom(roomId) {
+  hosting?.sync.stop();
+  hosting = { engine: null, applied: 0 };
+  hosting.sync = new RoomSync(roomId, renderRoom);
+  hosting.sync.refresh();
+  $('#host-form').hidden = true;
+  $('#host-room').hidden = false;
+}
+
+function stopHosting() {
+  hosting?.sync.stop();
+  hosting = null;
+  $('#host-form').hidden = false;
+  $('#host-room').hidden = true;
+}
+
+const ROOM_STATUS = { lobby: 'Lobby open', racing: 'Racing now', finished: 'Finished', cancelled: 'Closed' };
+
+function renderRoom(st, fresh) {
+  if (!hosting) return;
+  if (st.status === 'cancelled') { stopHosting(); return; }
+  $('#room-status').textContent = ROOM_STATUS[st.status];
+  $('#room-title').textContent = [st.season, st.title].filter(Boolean).join(' · ');
+  $('#room-code').textContent = st.code;
+
+  // Replay answers with the same engine students use, so positions match their screens.
+  if (st.status !== 'lobby' && !hosting.engine) {
+    hosting.engine = new RaceEngine({
+      participants: st.players.map((p) => ({ id: p.id, name: p.name })),
+      questions: Array.from({ length: 10 }, (_, i) => ({ id: `q${i + 1}` })),
+      mode: 'teacher',
+    });
+  }
+  if (hosting.engine) for (const ev of fresh) hosting.engine.record(ev.student_id, ev.question_id, ev.correct, `ev${ev.id}`);
+  const order = hosting.engine ? hosting.engine.order : st.players.map((p) => p.id);
+  const byId = Object.fromEntries(st.players.map((p) => [p.id, p]));
+  $('#room-rows').replaceChildren(...order.map((id, i) => {
+    const p = byId[id];
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td class="num"></td><td class="name"></td><td class="num"></td><td></td>';
+    tr.children[0].textContent = st.status === 'lobby' ? '' : i + 1;
+    tr.children[1].textContent = p.name;
+    tr.children[2].textContent = st.status === 'lobby' ? '' : `${p.correct} / 10`;
+    tr.children[3].textContent = st.winner_id === id ? 'Winner' : p.left ? 'Left the race' : st.status === 'lobby' ? 'Joined' : 'Racing';
+    return tr;
+  }));
+  if (!st.players.length) $('#room-rows').innerHTML = '<tr><td colspan="4" class="muted">No students yet. Show them the code.</td></tr>';
+  $('#room-start').hidden = st.status !== 'lobby';
+  $('#room-start').disabled = st.players.length < 1;
+  $('#room-cancel').hidden = st.status !== 'lobby';
+  $('#room-done').hidden = st.status !== 'finished';
+  $('#room-hint').textContent = st.status === 'lobby' ? 'Students choose Play with Teacher and type the code. Start when everyone has joined.'
+    : st.status === 'racing' ? 'Each student answers at their own pace. The first to 10 correct ends the race for everyone.'
+    : `Winner: ${byId[st.winner_id]?.name ?? '—'}. Rewards were added to each student's account.`;
+}
+
+$('#host-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try { const r = await api.createRoom($('#host-set').value); watchRoom(r.room_id); } catch (err) { notice(err.message, true); }
+});
+$('#room-start').addEventListener('click', async () => {
+  try { await api.startRoom(hosting.sync.roomId); hosting.sync.refresh(); } catch (err) { notice(err.message, true); }
+});
+$('#room-cancel').addEventListener('click', async () => {
+  try { await api.cancelRoom(hosting.sync.roomId); } catch (err) { notice(err.message, true); }
+  stopHosting();
+});
+$('#room-done').addEventListener('click', stopHosting);
 
 // ---------- shell ----------
 

@@ -12,7 +12,7 @@ Built from `Science_World_Complete_Handoff.md` (v1.0, 30 Oct 2026).
 | --- | --- | --- |
 | 1 | Playable 10-question Solo race (Three.js) | **Done** |
 | 2 | Student/teacher accounts, approval, saved O-Bucks, teacher question-set import and release | **Done**: 15/15 live checks pass against Supabase (`node tests/live-e2e.mjs`) |
-| 3 | Live multiplayer lobby (Friends / Teacher races) | Needs Stage 2 + a real web host |
+| 3 | Live multiplayer lobby (Friends / Teacher races) | **Built; SQL tests pass locally; needs `supabase/multiplayer.sql` applied** |
 | 4 | Reporting: teacher export, parent progress | Needs Stage 2 |
 
 ## Run locally
@@ -27,7 +27,7 @@ Pages: `index.html` (students and guests), `teacher.html` (teacher room).
 
 ## Supabase setup (once)
 
-1. Supabase → SQL Editor → paste `supabase/schema.sql` → Run (safe to re-run).
+1. Supabase → SQL Editor → paste `supabase/schema.sql` → Run, then the same for `supabase/multiplayer.sql` (both safe to re-run).
 2. Authentication → Sign In / Providers → Email → turn off **Confirm email** (students log in with usernames).
 3. Sign up on the game page with your teacher username, then run in the SQL Editor:
    `update public.profiles set role = 'teacher', status = 'approved' where username = 'your-username';`
@@ -80,6 +80,16 @@ a stub `auth` schema, then run `supabase/tests/rules_test.sql`.
 - O-Bucks are an append-only ledger with unique event keys: duplicate requests and replays add nothing (AC16, AC19).
 - PROVISIONAL (O04): first-attempt/correct rewards are once per student per question per set; the 500 participation bonus is once per student per set per mode, and needs ≥ 1 answer and ≥ 60 s of racing.
 - Students cannot read other students' profiles, races or balances, or write to the ledger.
+
+## Stage 3: live races
+
+- Friends: a student opens a lobby with a released Friends-bank set and shares a 5-letter code; everyone presses Ready; the host starts.
+- Teacher: the teacher opens a lobby from a Teacher-bank set in the teacher room's **Live races** tab; students choose Play with Teacher and enter the code. The teacher sees live standings.
+- Every answer is checked by the database and stored as a room event. Clients get them by Supabase Realtime (with a 2.5 s poll as backup) and replay them in database order, so all screens show the same positions.
+- The first answer that makes 10 correct ends the room for everyone in the same database transaction. Later answers are refused.
+- Rewards: 100 per new attempt, 100 per correct, 500 for every racer still in the race at the finish, 200 for the winner.
+- PROVISIONAL (O05): all approved students form one group; 8 racers max; no joining after the start; pressing Leave forfeits the 500; a dropped connection does not; reloading the page rejoins the race.
+- Tests: `supabase/tests/multiplayer_test.sql` (local Postgres) and `node tests/live-multiplayer.mjs` (two accounts racing on the live project).
 
 ## Known gaps
 

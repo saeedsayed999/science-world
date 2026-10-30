@@ -263,3 +263,23 @@ button.bay:hover { border-color: var(--gold); }
 @media (max-width: 640px) { .who { display: none; } }
 .opt.checking { border-color: var(--gold); animation: pulse .8s ease-in-out infinite alternate; }
 @keyframes pulse { to { background: rgba(242,193,78,.18); } }
+
+/* ---------- live rooms (Stage 3) ---------- */
+#join, #lobby { display: grid; place-items: center; align-content: center; gap: 12px; background: linear-gradient(180deg, rgba(8,10,14,.35), rgba(8,10,14,.75)); overflow-y: auto; }
+.join-wrap { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; width: min(640px, 100%); }
+.join-card { display: grid; gap: 10px; padding: 16px 18px; align-content: start; }
+.field { display: grid; gap: 4px; font-size: 13px; color: var(--ink-dim); }
+.field input, .field select { font: 500 16px var(--font-body); color: var(--ink); background: rgba(0,0,0,.35); border: 1px solid var(--glass-edge); border-radius: 8px; padding: 8px 10px; min-width: 0; }
+#join-code { font-family: var(--font-display); letter-spacing: .3em; text-transform: uppercase; font-size: 22px; }
+.join-msg { min-height: 1.2em; margin: 0; font-size: 14px; color: #ff8a92; text-align: center; }
+.lobby-card { width: min(520px, 100%); box-sizing: border-box; padding: 16px 18px; display: grid; gap: 12px; }
+.lobby-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.lobby-title { font-family: var(--font-display); font-weight: 700; font-size: clamp(18px, 2.4vw, 24px); }
+.code-box { text-align: right; }
+.code { font-family: var(--font-display); font-weight: 700; font-size: clamp(26px, 4vw, 38px); letter-spacing: .18em; color: var(--gold); }
+.lobby-players { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.lobby-players li { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 8px; background: rgba(255,255,255,.05); }
+.lobby-players li.me { outline: 1px solid var(--you); }
+.lobby-players .state { margin-left: auto; font-size: 12px; font-family: var(--font-display); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-dim); }
+.lobby-players .state.ready { color: var(--good); }
+.net { position: absolute; left: 50%; bottom: max(14px, env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: rgba(160,20,32,.85); border: 1px solid var(--bad); padding: 5px 14px; border-radius: 8px; font-size: 13px; }

@@ -8,6 +8,7 @@ import { RaceScene, loadCarTemplate } from './race-scene.js';
 import { RACE, BOTS, PLAYER_COLOR } from './config.js';
 import { SAMPLE_SET } from './questions.js';
 import { api } from './supabase.js';
+import { RoomSync } from './room-sync.js';
 
 const $ = (sel) => document.querySelector(sel);
 const LETTERS = ['A', 'B', 'C', 'D'];
@@ -28,6 +29,8 @@ let scene, template;
 let game = null; // active race controller state
 let profile = null; // signed-in student, or null for a guest
 let sets = [];
+let room = null;     // { id, sync, state } while in a live lobby or race
+let lastMode = 'solo';
 
 // ---------- boot ----------
 
@@ -56,6 +59,8 @@ async function route() {
     return show('pending');
   }
   await loadHome();
+  const active = await api.myActiveRoom().catch(() => null);
+  if (active) await enterRoom(active);
 }
 
 async function loadHome() {
@@ -65,7 +70,7 @@ async function loadHome() {
     $('#who-name').textContent = `${profile.first_name} ${profile.last_name}`.trim();
     $('#balance').textContent = fmt(profile.balance);
     $('#stage-note').textContent = sets.length
-      ? 'Stage 2 preview · Solo races save O-Bucks to your account'
+      ? 'Stage 3 preview · Solo, Friends and class races save O-Bucks'
       : 'No races are released yet. Your teacher will release one soon.';
   } else {
     sets = [{ id: 'guest', title: SAMPLE_SET.title, season: SAMPLE_SET.season }];
@@ -75,9 +80,9 @@ async function loadHome() {
   }
   const sel = $('#set-select');
   const keep = sel.value;
-  sel.replaceChildren(...sets.map((st) => new Option(st.season ? `${st.season} · ${st.title}` : st.title, st.id)));
+  sel.replaceChildren(...sets.filter((st) => !st.mode || st.mode === 'solo').map((st) => new Option(st.season ? `${st.season} · ${st.title}` : st.title, st.id)));
   if (sets.some((st) => st.id === keep)) sel.value = keep;
-  $('#play').disabled = sets.length === 0;
+  $('#play').disabled = false;
   updateHomeSub();
   show('home');
 }
@@ -137,9 +142,11 @@ async function startSolo() {
     { id: PLAYER, name: 'You', color: PLAYER_COLOR },
   ];
   const engine = new RaceEngine({ participants, questions, mode: 'solo', playerId: PLAYER });
+  lastMode = 'solo';
   game = {
     engine,
     raceId,
+    roomId: null,
     busy: false,
     colors: Object.fromEntries(participants.map((p) => [p.id, p.color])),
     phase: 'countdown',
@@ -223,13 +230,22 @@ async function answer(choice) {
     btn.classList.remove('checking');
     if (game !== g) return;
     if (!verdict) return showConnectionProblem();
-    if (verdict.status === 'rejected') return;
-    res = g.engine.record(PLAYER, q.id, verdict.status === 'correct', requestId);
+    if (g.roomId) {
+      // Live race: our answer comes back as a room event, applied in database
+      // order together with everyone else's, so all screens agree.
+      await room?.sync.refresh();
+      if (verdict.status === 'rejected') return;
+      res = g.eventResults[verdict.event_id];
+      if (!res) return;
+    } else {
+      if (verdict.status === 'rejected') return;
+      res = g.engine.record(PLAYER, q.id, verdict.status === 'correct', requestId);
+    }
   } else {
     res = g.engine.answer(PLAYER, q.id, choice, requestId);
   }
   if (game !== g || g.phase !== 'question') return;
-  afterMove(PLAYER, res);
+  if (!g.roomId) afterMove(PLAYER, res);
   if (res.status === 'correct') {
     btn.classList.add('right');
     $('#feedback').hidden = true;
@@ -315,7 +331,8 @@ function tickBots(dt) {
 function tick(dt) {
   if (settings.showFps) $('#fps').textContent = `${scene.fps} FPS`;
   if (!game) return;
-  if (game.phase === 'question' || game.phase === 'feedback' || game.phase === 'freedrive') tickBots(dt);
+  if (!game.roomId && (game.phase === 'question' || game.phase === 'feedback' || game.phase === 'freedrive')) tickBots(dt);
+  if (game.roomId) $('#net').hidden = room?.sync.online !== false;
   if (!game) return;
   if (game.phase === 'freedrive') {
     scene.steerInput = steerValue();
@@ -331,6 +348,11 @@ function tick(dt) {
 
 function finishRace() {
   const engine = game.engine;
+  // Live race finished by an answer this screen has not replayed yet: trust the server's winner.
+  if (!engine.winnerId && game.roomId && room?.state?.winner_id) {
+    engine.finished = true;
+    engine.winnerId = game.key(room.state.winner_id);
+  }
   game.phase = 'finished';
   scene.setFreeDrive(false);
   $('#qpanel').hidden = true;
@@ -341,7 +363,7 @@ function finishRace() {
   banner('Race complete', youWon ? 'You win!' : `${winner.name} wins`, youWon ? 'good' : 'neutral');
   const g = game;
   const saved = !g.raceId ? Promise.resolve(null)
-    : (youWon ? api.raceSummary(g.raceId) : api.finishSolo(g.raceId, winner.name)).catch(() => null);
+    : (youWon || g.roomId ? api.raceSummary(g.raceId) : api.finishSolo(g.raceId, winner.name)).catch(() => null);
   Promise.all([saved, new Promise((r) => setTimeout(r, 2200))]).then(([summary]) => renderResults(engine, g, summary));
 }
 
@@ -372,7 +394,7 @@ function renderResults(engine, g, summary) {
     $('#rw-first-v').textContent = fmt(e.first_attempt || 0);
     $('#rw-correct-v').textContent = fmt(e.first_correct || 0);
     $('#rw-part-v').textContent = fmt(e.participation || 0);
-    $('#rw-win-v').textContent = 'Not in Solo';
+    $('#rw-win-v').textContent = g.roomId ? fmt(e.winner || 0) : 'Not in Solo';
     $('#rw-total').textContent = fmt(total);
     $('#rw-note').textContent = total < rw.total
       ? `Balance: ${fmt(summary.balance)} O-Bucks. Questions and bonuses already rewarded on this set earn nothing again.`
@@ -387,12 +409,14 @@ function renderResults(engine, g, summary) {
     $('#rw-note').textContent = g.raceId ? 'Your answers were saved as you raced. Reopen the game to see your balance.' : 'Log in to keep O-Bucks.';
   }
   show('results');
+  if (g.roomId) stopRoom();
   game = null;
   scene.mode = 'attract';
 }
 
 function leaveRace() {
   if (game) game.engine.markLeft(PLAYER);
+  if (game?.roomId) { api.leaveRoom(game.roomId).catch(() => {}); stopRoom(); }
   game = null;
   scene.setFreeDrive(false);
   showcaseCars().then(() => loadHome());
@@ -416,6 +440,129 @@ function renderPositions() {
   }));
   clearTimeout(renderPositions._t);
   renderPositions._t = setTimeout(() => game && renderPositions(), 2600);
+}
+
+// ---------- live rooms (Friends / Teacher) ----------
+
+const RIVAL_COLORS = BOTS.colors.concat(['#ff5fa2', '#9be15d', '#ffffff']);
+
+async function openJoin(kind) {
+  if (!profile) {
+    $('#stage-note').textContent = 'Log in to race your friends and class. Guest races are Solo only.';
+    return show('home');
+  }
+  lastMode = kind;
+  $('#join-msg').textContent = '';
+  $('#join-code').value = '';
+  const friends = kind === 'friends';
+  $('#create-form').hidden = !friends;
+  $('#join-label').textContent = friends ? 'Join a friend’s lobby' : 'Enter the code your teacher shows';
+  if (friends) {
+    const list = sets.filter((st) => st.mode === 'friends');
+    $('#friends-set').replaceChildren(...list.map((st) => new Option([st.season, st.title].filter(Boolean).join(' · '), st.id)));
+    $('#create-empty').hidden = list.length > 0;
+    $('#create-form button').disabled = list.length === 0;
+  }
+  show('join');
+}
+
+async function enterRoom(roomId) {
+  stopRoom();
+  room = { id: roomId, state: null, sync: null };
+  room.sync = new RoomSync(roomId, onRoomUpdate);
+  const st = await room.sync.refresh();
+  if (!st && room?.id === roomId) {
+    stopRoom();
+    $('#join-msg').textContent = 'Could not open that race. Check your connection and try again.';
+    show('join');
+  }
+}
+
+function stopRoom() {
+  room?.sync.stop();
+  room = null;
+}
+
+function onRoomUpdate(st, fresh) {
+  if (!room || st.id !== room.id) return;
+  room.state = st;
+  lastMode = st.mode;
+  if (st.status === 'cancelled') {
+    stopRoom();
+    loadHome().then(() => { $('#stage-note').textContent = 'That lobby was closed by its host.'; });
+    return;
+  }
+  if (st.status === 'lobby') return renderLobby(st);
+  if (!st.my_race_id) return; // not a racer in this room
+  if (!game || game.roomId !== st.id) {
+    if (st.status === 'finished') { stopRoom(); return loadHome(); }
+    return startLiveRace(st, fresh);
+  }
+  applyRoomEvents(st, fresh);
+  if (st.status === 'finished' && game.phase !== 'finished') finishRace();
+}
+
+function renderLobby(st) {
+  if (document.body.dataset.screen !== 'lobby') { $('#lobby-msg').textContent = ''; show('lobby'); }
+  const teacherRoom = st.mode === 'teacher';
+  $('#lobby-kind').textContent = teacherRoom ? `Class race · ${st.host_name}` : 'Friends race';
+  $('#lobby-title').textContent = [st.season, st.title].filter(Boolean).join(' · ');
+  $('#lobby-code').textContent = st.code;
+  $('#lobby-players').replaceChildren(...st.players.map((p) => {
+    const li = document.createElement('li');
+    if (p.id === st.me) li.className = 'me';
+    li.innerHTML = '<span class="nm"></span><span class="state"></span>';
+    li.querySelector('.nm').textContent = p.id === st.me ? `${p.name} (you)` : p.name;
+    const state = li.querySelector('.state');
+    state.textContent = teacherRoom ? 'Joined' : p.ready ? 'Ready' : 'Not ready';
+    if (teacherRoom || p.ready) state.classList.add('ready');
+    return li;
+  }));
+  const me = st.players.find((p) => p.id === st.me);
+  $('#lobby-ready').hidden = teacherRoom;
+  $('#lobby-ready').textContent = me?.ready ? 'Not ready' : 'Ready';
+  const allReady = st.players.length >= 2 && st.players.every((p) => p.ready);
+  $('#lobby-start').hidden = !st.is_host;
+  $('#lobby-start').disabled = !allReady;
+  $('#lobby-hint').textContent = teacherRoom ? 'Waiting for your teacher to start the race.'
+    : st.is_host ? (allReady ? 'Everyone is ready.' : `Share code ${st.code} with friends in your group. Start when everyone is ready.`)
+    : `Waiting for ${st.host_name} to start.`;
+}
+
+function startLiveRace(st, events) {
+  const key = (id) => (id === st.me ? PLAYER : id);
+  let c = 0;
+  const participants = st.players.map((p) => ({
+    id: key(p.id), name: p.id === st.me ? 'You' : p.name,
+    color: p.id === st.me ? PLAYER_COLOR : RIVAL_COLORS[c++ % RIVAL_COLORS.length],
+  }));
+  const engine = new RaceEngine({ participants, questions: st.questions, mode: st.mode });
+  game = {
+    engine, raceId: st.my_race_id, roomId: st.id, key, eventResults: {},
+    busy: false, colors: Object.fromEntries(participants.map((p) => [p.id, p.color])),
+    phase: 'countdown', timer: 0, attempt: 0, bots: [], moved: {},
+  };
+  for (const p of st.players) if (p.left) engine.markLeft(key(p.id));
+  scene.mode = 'race';
+  scene.setCars(engine.order.map((id) => ({ id, color: game.colors[id] })), template);
+  scene.setPlayer(PLAYER);
+  applyRoomEvents(st, events);
+  for (const id of ['#qpanel', '#freedrive', '#banner', '#steer']) $(id).hidden = true;
+  show('hud');
+  if (engine.finished || st.status === 'finished') return finishRace();
+  // Joining (or reloading) well after the start skips the start lights.
+  const late = st.started_at && Date.now() - Date.parse(st.started_at) > 6000;
+  if (late) { game.phase = 'question'; showQuestion(); } else runCountdown();
+}
+
+function applyRoomEvents(st, events) {
+  for (const ev of events) {
+    const id = game.key(ev.student_id);
+    const res = game.engine.record(id, ev.question_id, ev.correct, `ev${ev.id}`);
+    game.eventResults[ev.id] = res;
+    if (res.status !== 'rejected') afterMove(id, res);
+  }
+  if (!events.length) renderPositions();
 }
 
 // ---------- input: keyboard, touch, gamepad ----------
@@ -490,7 +637,36 @@ $('#close-settings').addEventListener('click', () => { $('#settings').hidden = t
 $('#play').addEventListener('click', () => show('modes'));
 $('#modes-back').addEventListener('click', () => show('home'));
 $('#mode-solo').addEventListener('click', () => startSolo());
-$('#again').addEventListener('click', () => startSolo());
+$('#mode-friends').addEventListener('click', () => openJoin('friends'));
+$('#mode-teacher').addEventListener('click', () => openJoin('teacher'));
+$('#join-back').addEventListener('click', () => show('modes'));
+$('#create-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try { const r = await api.createRoom($('#friends-set').value); await enterRoom(r.room_id); }
+  catch (err) { $('#join-msg').textContent = err.message; }
+});
+$('#join-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try { const r = await api.joinRoom($('#join-code').value); await enterRoom(r.room_id); }
+  catch (err) { $('#join-msg').textContent = err.message; }
+});
+$('#lobby-ready').addEventListener('click', async () => {
+  const me = room?.state?.players.find((p) => p.id === room.state.me);
+  if (!me) return;
+  await api.setReady(room.id, !me.ready).catch((err) => { $('#lobby-msg').textContent = err.message; });
+  room?.sync.refresh();
+});
+$('#lobby-start').addEventListener('click', async () => {
+  $('#lobby-msg').textContent = '';
+  try { await api.startRoom(room.id); room.sync.refresh(); } catch (err) { $('#lobby-msg').textContent = err.message; }
+});
+$('#lobby-leave').addEventListener('click', async () => {
+  const id = room?.id;
+  stopRoom();
+  if (id) await api.leaveRoom(id).catch(() => {});
+  loadHome();
+});
+$('#again').addEventListener('click', () => (lastMode === 'solo' ? startSolo() : openJoin(lastMode)));
 $('#res-home').addEventListener('click', () => showcaseCars().then(() => loadHome()));
 $('#set-select').addEventListener('change', updateHomeSub);
 

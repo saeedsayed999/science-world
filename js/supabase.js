@@ -47,6 +47,16 @@ export const api = {
   finishSolo: (raceId, botName) => rpc('finish_solo_race', { p_race_id: raceId, p_bot_name: botName }),
   raceSummary: (raceId) => rpc('race_summary', { p_race_id: raceId }),
 
+  // Live rooms (Friends / Teacher races)
+  myActiveRoom: () => rpc('my_active_room'),
+  createRoom: (setId) => rpc('create_room', { p_set_id: setId }),
+  joinRoom: (code) => rpc('join_room', { p_code: code }),
+  setReady: (roomId, ready) => rpc('set_ready', { p_room: roomId, p_ready: ready }),
+  leaveRoom: (roomId) => rpc('leave_room', { p_room: roomId }),
+  startRoom: (roomId) => rpc('start_room', { p_room: roomId }),
+  cancelRoom: (roomId) => rpc('cancel_room', { p_room: roomId }),
+  roomState: (roomId, since = 0) => rpc('room_state', { p_room: roomId, p_since: since }),
+
   // Teacher
   students: () => rpc('teacher_students'),
   setStatus: (userId, status) => rpc('set_account_status', { p_user: userId, p_status: status }),

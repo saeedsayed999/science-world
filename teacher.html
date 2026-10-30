@@ -15,6 +15,7 @@
     <nav class="tabs" aria-label="Sections">
       <button data-tab="students" aria-current="page">Students <span id="pending-count" class="badge" hidden></span></button>
       <button data-tab="sets">Question sets</button>
+      <button data-tab="live">Live races</button>
     </nav>
     <div class="me"><span id="me-name"></span> <button id="sign-out" class="ghost">Log out</button></div>
   </div>
@@ -80,6 +81,35 @@
 
     <div id="set-list" class="set-list"></div>
     <p id="no-sets" class="empty" hidden>No sets yet. Import one above.</p>
+  </section>
+  <section id="live" hidden>
+    <div class="section-head"><h1>Live races</h1></div>
+    <form id="host-form" class="card host-form">
+      <label>Teacher set <select id="host-set"></select></label>
+      <button class="primary" type="submit">Open lobby</button>
+      <p id="host-empty" class="hint" hidden>Import a set with the <b>Teacher bank</b> mode first. Teacher sets do not need to be released to students.</p>
+    </form>
+    <div id="host-room" class="card" hidden>
+      <div class="room-head">
+        <div>
+          <div class="muted" id="room-status"></div>
+          <h2 id="room-title"></h2>
+        </div>
+        <div class="room-code"><span class="muted">Students enter</span><strong id="room-code"></strong></div>
+      </div>
+      <div class="table-wrap">
+        <table class="grid">
+          <thead><tr><th>#</th><th>Student</th><th class="num">Correct</th><th>State</th></tr></thead>
+          <tbody id="room-rows"></tbody>
+        </table>
+      </div>
+      <p id="room-hint" class="hint"></p>
+      <div class="room-actions">
+        <button id="room-start" class="primary">Start race</button>
+        <button id="room-cancel" class="ghost">Close lobby</button>
+        <button id="room-done" class="ghost" hidden>Done</button>
+      </div>
+    </div>
   </section>
 </main>
 
