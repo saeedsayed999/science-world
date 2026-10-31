@@ -166,20 +166,25 @@
     <div id="feedback" hidden></div>
   </div>
 
-  <div id="freedrive" hidden>
-    <div class="fd-label">Free Drive</div>
-    <div id="fdclock" class="fd-clock">00:15</div>
-    <div class="fd-hint">Steer for fun · your place is set by answers</div>
+  <div id="drive" hidden>
+    <div id="drive-label" class="fd-label">Turbo</div>
+    <div id="drive-clock" class="fd-clock">00:05</div>
   </div>
 
   <div id="banner" hidden></div>
+  <div id="crash" hidden aria-live="assertive">
+    <div class="crash-word">Crash!</div>
+    <div class="crash-sub">Three wrong in a row · back on track in 3 s</div>
+  </div>
+  <div id="speedo" aria-hidden="true"><span id="speed">0</span><small>km/h</small></div>
+  <div id="offroad" hidden>Off track · slowing down</div>
   <div id="countdown" hidden></div>
 
   <canvas id="minimap" width="180" height="150" class="glass" aria-hidden="true"></canvas>
 
   <div id="steer" hidden>
     <button id="steer-l" class="steer-btn" aria-label="Steer left">‹</button>
-    <span class="steer-keys">← → or A / D</span>
+    <span class="steer-keys">Steer ← →</span>
     <button id="steer-r" class="steer-btn" aria-label="Steer right">›</button>
   </div>
 

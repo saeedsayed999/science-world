@@ -7,7 +7,10 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 export const SUPABASE_URL = 'https://vzoxxjbvqjstghbdfnjg.supabase.co';
 export const SUPABASE_KEY = 'sb_publishable_3S2Bx_a6k17A1xyHS6fKDg_DWrw9O7n';
 
-export const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+// Local testing only: ?slot=2 on localhost keeps a separate login per tab, so
+// two students can race each other from one browser. Ignored on the live site.
+const slot = location.hostname === 'localhost' ? new URLSearchParams(location.search).get('slot') : null;
+export const sb = createClient(SUPABASE_URL, SUPABASE_KEY, slot ? { auth: { storageKey: `sb-test-slot-${slot}` } } : undefined);
 
 // Students have usernames, not email addresses. Supabase Auth needs an email,
 // so each username maps to an internal address that never receives mail.

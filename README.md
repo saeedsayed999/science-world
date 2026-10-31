@@ -91,6 +91,22 @@ a stub `auth` schema, then run `supabase/tests/rules_test.sql`.
 - PROVISIONAL (O05): all approved students form one group; 8 racers max; no joining after the start; pressing Leave forfeits the 500; a dropped connection does not; reloading the page rejoins the race.
 - Tests: `supabase/tests/multiplayer_test.sql` (local Postgres) and `node tests/live-multiplayer.mjs` (two accounts racing on the live project).
 
+## Game rebuild (owner feedback, 31 Oct 2026)
+
+Owner decisions that replace handoff rules (recorded so they are not mistaken for the original spec):
+- Real-distance racing instead of swap-one-place positions. Correct on the first try = 5 s turbo (46 m/s); correct after a wrong answer = 5 s normal drive (34 m/s); wrong = brake for 2 s; three wrong in a row = 3 s crash during which answers are locked.
+- Drive time is 5 s (handoff said 15 s).
+- Steering is always live and matters a little: off-road costs 30% speed. A slow random drift means cars are never on autopilot.
+- The winner is still the first to 10 correct answers, judged by the server.
+
+Implementation: `js/race-sim.js` (car physics, tested in `tests/race-sim.test.mjs`), `js/race-scene.js` (Sky shader sunset with
+reflections, sea, town, palms, boards, stands, particles, speed lines, bloom on High), `js/cars.js` (catalogue + loader),
+`tools/make_cars.py` (Blender generator for the 10 car models in `assets/cars/`). Live races stream each car's position
+8 times a second over a Supabase Realtime broadcast channel `cars-<room>`; remote cars are drawn at their broadcast
+position and fall back to simulating from answer events if updates stop.
+
+Local two-player testing: open `http://localhost:5173/?slot=2` in a second tab for a separate login (localhost only).
+
 ## Known gaps
 
 - No store, Collection, Stats, season map or parent accounts yet. Guest races save nothing.

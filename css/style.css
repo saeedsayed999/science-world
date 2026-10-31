@@ -144,7 +144,7 @@ button.bay:hover { border-color: var(--gold); }
 .pill.bad { background: rgba(160,20,32,.85); border: 1px solid var(--bad); }
 @keyframes shake { 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
 
-#freedrive {
+#drive {
   position: absolute; top: max(12px, env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%);
   text-align: center; padding: 6px 30px 8px;
   background: linear-gradient(180deg, rgba(10,40,70,.88), rgba(8,22,40,.88));
@@ -166,9 +166,10 @@ button.bay:hover { border-color: var(--gold); }
 
 #countdown { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); font-family: var(--font-display); font-weight: 700; font-style: italic; font-size: clamp(56px, 10vw, 110px); color: var(--good); text-shadow: 0 4px 24px rgba(0,0,0,.6); pointer-events: none; }
 
-#minimap { position: absolute; left: max(12px, env(safe-area-inset-left, 0px)); bottom: max(12px, env(safe-area-inset-bottom, 0px)); width: clamp(110px, 14vw, 180px); height: auto; }
+#minimap { position: absolute; right: max(12px, env(safe-area-inset-right, 0px)); top: calc(max(12px, env(safe-area-inset-top, 0px)) + 44px); width: clamp(100px, 13vw, 170px); height: auto; }
 
-#steer { position: absolute; right: max(16px, env(safe-area-inset-right, 0px)); bottom: max(14px, env(safe-area-inset-bottom, 0px)); display: flex; align-items: center; gap: 12px; }
+#steer { position: absolute; left: max(16px, env(safe-area-inset-left, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); bottom: max(14px, env(safe-area-inset-bottom, 0px)); display: flex; align-items: flex-end; justify-content: space-between; pointer-events: none; }
+#steer > * { pointer-events: auto; }
 .steer-btn { width: clamp(58px, 9vw, 84px); height: clamp(58px, 9vw, 84px); border-radius: 50%; background: var(--glass); border: 1.5px solid var(--you); font-size: 34px; line-height: 1; touch-action: none; }
 .steer-btn:active { background: rgba(24,198,232,.35); }
 .steer-keys { font-size: 12px; color: var(--ink-dim); background: var(--glass); padding: 4px 8px; border-radius: 6px; }
@@ -283,3 +284,31 @@ button.bay:hover { border-color: var(--gold); }
 .lobby-players .state { margin-left: auto; font-size: 12px; font-family: var(--font-display); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-dim); }
 .lobby-players .state.ready { color: var(--good); }
 .net { position: absolute; left: 50%; bottom: max(14px, env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: rgba(160,20,32,.85); border: 1px solid var(--bad); padding: 5px 14px; border-radius: 8px; font-size: 13px; }
+
+/* ---------- distance racing (Part 1 rebuild) ---------- */
+#drive.turbo { border-color: #ffb648; background: linear-gradient(180deg, rgba(90,40,0,.88), rgba(40,14,0,.88)); box-shadow: 0 0 34px rgba(255,150,40,.55); }
+#drive.turbo .fd-label { color: #ffcf7a; }
+#banner.turbo { color: #ffb648; }
+#banner.turbo .b-big { color: #fff6e0; text-shadow: 0 0 26px rgba(255,150,40,.9), 0 4px 18px rgba(0,0,0,.6); }
+.pill.warn { background: rgba(120,80,0,.85); border: 1px solid #f2c14e; }
+#positions li.crashed .nm { color: var(--bad); }
+#speedo {
+  position: absolute; left: 50%; bottom: max(14px, env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+  font-family: var(--font-display); font-weight: 700; font-style: italic; font-size: clamp(30px, 4.6vw, 46px); line-height: 1;
+  text-shadow: 0 2px 12px rgba(0,0,0,.7); font-variant-numeric: tabular-nums; pointer-events: none; display: flex; align-items: baseline; gap: 4px;
+}
+#speedo small { font-size: 13px; font-style: normal; color: var(--ink-dim); letter-spacing: .08em; }
+#offroad { position: absolute; left: 50%; bottom: calc(max(14px, env(safe-area-inset-bottom, 0px)) + 52px); transform: translateX(-50%); background: rgba(120,80,0,.85); border: 1px solid var(--gold); padding: 4px 12px; border-radius: 8px; font-size: 13px; pointer-events: none; }
+#crash { position: fixed; inset: 0; display: grid; place-content: center; text-align: center; pointer-events: none; z-index: 5;
+  background: radial-gradient(ellipse at center, rgba(0,0,0,0) 35%, rgba(200,0,20,.55) 100%); }
+#crash.go { animation: crashIn 2.2s ease-out forwards; }
+.crash-word { font-family: var(--font-display); font-weight: 700; font-style: italic; text-transform: uppercase; font-size: clamp(56px, 11vw, 130px); line-height: .9;
+  color: #fff; letter-spacing: .02em; text-shadow: 0 0 30px rgba(255,40,40,.9), 4px 4px 0 #b3001b, 0 8px 30px rgba(0,0,0,.6); }
+.crash-sub { margin-top: 8px; font-family: var(--font-display); text-transform: uppercase; letter-spacing: .1em; font-size: clamp(12px, 1.6vw, 16px);
+  background: rgba(120,0,16,.85); border: 1px solid var(--bad); padding: 5px 14px; border-radius: 8px; justify-self: center; }
+@keyframes crashIn {
+  0% { opacity: 0; transform: scale(1.4); } 8% { opacity: 1; transform: scale(.94); } 14% { transform: scale(1.03) translateX(-6px); }
+  20% { transform: scale(1) translateX(5px); } 26% { transform: translateX(0); } 80% { opacity: 1; } 100% { opacity: 0; }
+}
+.stage-note:empty { display: none; }
+#steer .steer-keys { display: none; }
